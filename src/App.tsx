@@ -114,14 +114,9 @@ function App() {
   };
 
   const resetEqualizer = () => {
-  // Сбрасываем состояние equalizerBands
-  setEqualizerBands(DEFAULT_EQUALIZER_BANDS);
-
-  // Сбрасываем значения фильтров
-  equalizerNodesRef.current.forEach((node, index) => {
-    if (node) {
-      node.gain.value = DEFAULT_EQUALIZER_BANDS[index].gain; // Устанавливаем начальные значения
-      }
+    setEqualizerBands(DEFAULT_EQUALIZER_BANDS);
+    equalizerNodesRef.current.forEach((node, index) => {
+      node.gain.value = 0;
     });
   };
 
@@ -223,16 +218,16 @@ function App() {
   };
 
   const handleEqualizerChange = (index: number, value: number) => {
-  if (!audioContextRef.current || !isAudioInitialized.current) {
-    return;
+    if (!audioContextRef.current || !isAudioInitialized.current) {
+      return;
     }
 
-  const newBands = [...equalizerBands];
-  newBands[index].gain = value; // Обновляем состояние
-  setEqualizerBands(newBands);
+    const newBands = [...equalizerBands];
+    newBands[index].gain = value;
+    setEqualizerBands(newBands);
 
-  if (equalizerNodesRef.current[index]) {
-    equalizerNodesRef.current[index].gain.value = value; // Применяем новое значение к фильтру
+    if (equalizerNodesRef.current[index]) {
+      equalizerNodesRef.current[index].gain.value = value;
     }
   };
 
@@ -463,27 +458,28 @@ function App() {
 
               {/* Equalizer */}
               {showEqualizer && (
-  <div className="pt-4 border-t border-white/10">
-    <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-      {equalizerBands.map((band, index) => (
-        <div key={band.frequency} className="flex flex-col items-center gap-2">
-          <input
-            type="range"
-            min="-12"
-            max="12"
-            step="0.1"
-            value={band.gain} // Значение берется из состояния
-            onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
-            className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
-                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
-                      [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
-          />
-          <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                <div className="pt-4 border-t border-white/10">
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {equalizerBands.map((band, index) => (
+                      <div key={band.frequency} className="flex flex-col items-center gap-2">
+                        <input
+                          type="range"
+                          min="-12"
+                          max="12"
+                          step="0.1"
+                          value={band.gain}
+                          onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
+                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
+                              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
+                              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                          onTouchMove={(e) => e.stopPropagation()}
+                        />
+                        <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             
             <audio
