@@ -293,7 +293,7 @@ function App() {
           <div className="flex items-center gap-3 mb-6 sm:mb-8">
             <Music2 className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" />
             <h1 className="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-              Аудиобиблиотека
+              @FellGoodMusicBot
             </h1>
           </div>
           
