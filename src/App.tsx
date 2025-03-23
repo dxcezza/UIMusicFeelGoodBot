@@ -14,7 +14,8 @@ interface EqualizerBand {
   gain: number;
 }
 
-const DEFAULT_EQUALIZER_BANDS: EqualizerBand[] = [
+// Создаем функцию для получения начальных значений эквалайзера
+const getDefaultEqualizerBands = (): EqualizerBand[] => [
   { frequency: 32, gain: 0 },
   { frequency: 64, gain: 0 },
   { frequency: 125, gain: 0 },
@@ -39,7 +40,7 @@ function App() {
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
-  const [equalizerBands, setEqualizerBands] = useState<EqualizerBand[]>(DEFAULT_EQUALIZER_BANDS);
+  const [equalizerBands, setEqualizerBands] = useState<EqualizerBand[]>(getDefaultEqualizerBands());
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -64,7 +65,6 @@ function App() {
       document.removeEventListener('touchmove', preventScroll);
     };
   }, [showEqualizer]);
-
 
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
@@ -114,17 +114,16 @@ function App() {
     }
   };
 
-const resetEqualizer = () => {
-  // Обновляем состояние equalizerBands до значений по умолчанию
-  setEqualizerBands([...DEFAULT_EQUALIZER_BANDS]);
+  const resetEqualizer = () => {
+    const defaultBands = getDefaultEqualizerBands();
+    setEqualizerBands(defaultBands);
 
-  // Обновляем значения фильтров
-  equalizerNodesRef.current.forEach((node, index) => {
-    if (node) {
-      node.gain.setValueAtTime(DEFAULT_EQUALIZER_BANDS[index].gain, audioContextRef.current?.currentTime || 0);
-    }
-  });
-};
+    equalizerNodesRef.current.forEach((node, index) => {
+      if (node && audioContextRef.current) {
+        node.gain.setValueAtTime(defaultBands[index].gain, audioContextRef.current.currentTime);
+      }
+    });
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
