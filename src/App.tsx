@@ -14,7 +14,7 @@ interface EqualizerBand {
   gain: number;
 }
 
-const getDefaultEqualizerBands = (): EqualizerBand[] => [
+const DEFAULT_EQUALIZER_BANDS: EqualizerBand[] = [
   { frequency: 32, gain: 0 },
   { frequency: 64, gain: 0 },
   { frequency: 125, gain: 0 },
@@ -36,10 +36,10 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
-  const [equalizerBands, setEqualizerBands] = useState<EqualizerBand[]>(getDefaultEqualizerBands());
+  const [equalizerBands, setEqualizerBands] = useState<EqualizerBand[]>(DEFAULT_EQUALIZER_BANDS);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -50,18 +50,24 @@ function App() {
   const playerRef = useRef<HTMLDivElement>(null);
   const isAudioInitialized = useRef<boolean>(false);
   const volumeControlRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
+  const minSwipeDistance = 50; // минимальное расстояние для свайпа
 
-  // Инициализация AudioContext при монтировании компонента
+  // Prevent scroll when adjusting equalizer sliders
   useEffect(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
-    }
-    return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+    const preventScroll = (e: TouchEvent) => {
+      if (showEqualizer) {
+        e.preventDefault();
       }
     };
-  }, []);
+
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    return () => {
+      document.removeEventListener('touchmove', preventScroll);
+    };
+  }, [showEqualizer]);
+
+  // Handle swipe gesture for equalizer
 
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
@@ -85,17 +91,11 @@ function App() {
     }
   }, []);
 
-  const initializeAudioContext = () => {
-    if (!isAudioInitialized.current && audioRef.current) {
-      if (audioContextRef.current?.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
+  const initializeAudioContext = async () => {
+    if (!audioContextRef.current && audioRef.current && !isAudioInitialized.current) {
+      audioContextRef.current = new AudioContext();
+      sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
 
-      if (!sourceNodeRef.current) {
-        sourceNodeRef.current = audioContextRef.current!.createMediaElementSource(audioRef.current);
-      }
-
-      // Пересоздаем фильтры
       equalizerNodesRef.current = equalizerBands.map(band => {
         const filter = audioContextRef.current!.createBiquadFilter();
         filter.type = band.frequency <= 32 ? 'lowshelf' : band.frequency >= 16000 ? 'highshelf' : 'peaking';
@@ -105,27 +105,40 @@ function App() {
         return filter;
       });
 
-      // Подключаем фильтры
       sourceNodeRef.current.connect(equalizerNodesRef.current[0]);
       equalizerNodesRef.current.forEach((node, i) => {
         if (i < equalizerNodesRef.current.length - 1) {
           node.connect(equalizerNodesRef.current[i + 1]);
         }
       });
-      equalizerNodesRef.current[equalizerNodesRef.current.length - 1].connect(audioContextRef.current!.destination);
+      equalizerNodesRef.current[equalizerNodesRef.current.length - 1].connect(audioContextRef.current.destination);
       
       isAudioInitialized.current = true;
     }
   };
 
   const resetEqualizer = () => {
-    const defaultBands = getDefaultEqualizerBands();
+    // Создаем новый массив с дефолтными значениями
+    const defaultBands = DEFAULT_EQUALIZER_BANDS.map(band => ({
+      frequency: band.frequency,
+      gain: 0
+    }));
+    
+    // Обновляем состояние эквалайзера
     setEqualizerBands(defaultBands);
-
+    
+    // Обновляем значения узлов эквалайзера
     equalizerNodesRef.current.forEach((node, index) => {
-      if (node && audioContextRef.current) {
-        node.gain.setValueAtTime(defaultBands[index].gain, audioContextRef.current.currentTime);
+      if (node && node.gain) {
+        // Устанавливаем gain в 0 для каждого узла
+        node.gain.setValueAtTime(0, audioContextRef.current?.currentTime || 0);
       }
+    });
+
+    // Принудительно обновляем UI слайдеров
+    const sliders = document.querySelectorAll('.vertical-slider') as NodeListOf<HTMLInputElement>;
+    sliders.forEach((slider) => {
+      slider.value = '0';
     });
   };
 
@@ -157,18 +170,39 @@ function App() {
     setAudioUrl(audioUrl);
     setIsPlaying(true);
 
-    // Инициализируем аудио контекст при первом воспроизведении
-    initializeAudioContext();
+    // Ждем, пока audioRef.current станет доступным
+    await new Promise(resolve => {
+      const checkAudio = () => {
+        if (audioRef.current) {
+          resolve(true);
+        } else {
+          setTimeout(checkAudio, 100);
+        }
+      };
+      checkAudio();
+    });
+
+    // Теперь инициализируем аудиоконтекст
+    await initializeAudioContext();
+    if (audioContextRef.current?.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+
+    // Применяем текущие настройки эквалайзера
+    equalizerBands.forEach((band, index) => {
+      if (equalizerNodesRef.current[index] && equalizerNodesRef.current[index].gain) {
+        equalizerNodesRef.current[index].gain.setValueAtTime(
+          band.gain,
+          audioContextRef.current?.currentTime || 0
+        );
+      }
+    });
 
     if (waveformRef.current) {
       waveformRef.current.load(audioUrl);
       waveformRef.current.on('ready', () => {
         waveformRef.current?.play();
       });
-    }
-
-    if (audioContextRef.current?.state === 'suspended') {
-      await audioContextRef.current.resume();
     }
   };
 
@@ -178,8 +212,7 @@ function App() {
 
   const togglePlay = async () => {
     if (audioRef.current) {
-      // Инициализируем аудио контекст при необходимости
-      initializeAudioContext();
+      await initializeAudioContext();
 
       if (audioContextRef.current?.state === 'suspended') {
         await audioContextRef.current.resume();
@@ -238,7 +271,7 @@ function App() {
     setEqualizerBands(newBands);
 
     if (equalizerNodesRef.current[index]) {
-      equalizerNodesRef.current[index].gain.setValueAtTime(value, audioContextRef.current.currentTime);
+      equalizerNodesRef.current[index].gain.value = value;
     }
   };
 
@@ -269,6 +302,47 @@ function App() {
       audioRef.current.volume = volume;
     }
   }, [volume]);
+
+  // Обработка свайпа для эквалайзера
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      // Игнорируем свайпы в области эквалайзера
+      const isEqualizerArea = (e.target as Element).closest('.equalizer-controls');
+      if (playerRef.current?.contains(e.target as Node) && !isEqualizerArea) {
+        touchStartY.current = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchStartY.current || !playerRef.current?.contains(e.target as Node)) return;
+
+      const touchEndY = e.changedTouches[0].clientY;
+      const swipeDistance = touchStartY.current - touchEndY;
+
+      if (Math.abs(swipeDistance) >= minSwipeDistance) {
+        if (swipeDistance > 0) { // свайп вверх
+          setShowEqualizer(true);
+        } else { // свайп вниз
+          setShowEqualizer(false);
+        }
+      }
+
+      touchStartY.current = null;
+    };
+
+    // Добавляем обработчики только для мобильных устройств
+    if ('ontouchstart' in window) {
+      document.addEventListener('touchstart', handleTouchStart);
+      document.addEventListener('touchend', handleTouchEnd);
+    }
+
+    return () => {
+      if ('ontouchstart' in window) {
+        document.removeEventListener('touchstart', handleTouchStart);
+        document.removeEventListener('touchend', handleTouchEnd);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white">
@@ -362,7 +436,10 @@ function App() {
 
       {/* Fixed Player */}
       {currentTrack && (
-        <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10">
+        <div 
+          ref={playerRef}
+          className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 touch-none"
+        >
           <div className="max-w-6xl mx-auto p-4">
             <div className="flex flex-col gap-4">
               {/* Player Controls */}
@@ -413,7 +490,31 @@ function App() {
                       max={duration || 0}
                       value={currentTime}
                       onChange={handleSeek}
-                      className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                      onTouchMove={(e) => e.stopPropagation()}
+                      className="flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer 
+                        [&::-webkit-slider-thumb]:appearance-none 
+                        [&::-webkit-slider-thumb]:w-6 
+                        [&::-webkit-slider-thumb]:h-6 
+                        [&::-webkit-slider-thumb]:rounded-full 
+                        [&::-webkit-slider-thumb]:bg-purple-500
+                        [&::-webkit-slider-thumb]:shadow-lg
+                        [&::-webkit-slider-thumb]:shadow-black/50
+                        [&::-webkit-slider-thumb]:border-2
+                        [&::-webkit-slider-thumb]:border-purple-300
+                        [&::-moz-range-thumb]:w-6
+                        [&::-moz-range-thumb]:h-6
+                        [&::-moz-range-thumb]:rounded-full
+                        [&::-moz-range-thumb]:bg-purple-500
+                        [&::-moz-range-thumb]:border-2
+                        [&::-moz-range-thumb]:border-purple-300
+                        [&::-moz-range-thumb]:shadow-lg
+                        [&::-moz-range-thumb]:shadow-black/50
+                        hover:[&::-webkit-slider-thumb]:bg-purple-400
+                        hover:[&::-moz-range-thumb]:bg-purple-400
+                        active:[&::-webkit-slider-thumb]:scale-110
+                        active:[&::-moz-range-thumb]:scale-110
+                        transition-all
+                        touch-none"
                     />
                     <span className="text-xs sm:text-sm text-gray-400 w-8 sm:w-12">
                       {formatTime(duration)}
@@ -422,7 +523,7 @@ function App() {
                 </div>
                 
                 {/* Volume Control */}
-                <div ref={volumeControlRef} className="flex items-center gap-2 w-full sm:w-32">
+                <div ref={volumeControlRef} className="flex items-center gap-2 w-full sm:w-32 touch-none">
                   <button onClick={toggleMute} className="text-gray-400 hover:text-white transition-colors">
                     {isMuted ? (
                       <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -437,7 +538,31 @@ function App() {
                     step="0.01"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                    onTouchMove={(e) => e.stopPropagation()}
+                    className="flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer
+                      [&::-webkit-slider-thumb]:appearance-none 
+                      [&::-webkit-slider-thumb]:w-6 
+                      [&::-webkit-slider-thumb]:h-6 
+                      [&::-webkit-slider-thumb]:rounded-full 
+                      [&::-webkit-slider-thumb]:bg-purple-500
+                      [&::-webkit-slider-thumb]:shadow-lg
+                      [&::-webkit-slider-thumb]:shadow-black/50
+                      [&::-webkit-slider-thumb]:border-2
+                      [&::-webkit-slider-thumb]:border-purple-300
+                      [&::-moz-range-thumb]:w-6
+                      [&::-moz-range-thumb]:h-6
+                      [&::-moz-range-thumb]:rounded-full
+                      [&::-moz-range-thumb]:bg-purple-500
+                      [&::-moz-range-thumb]:border-2
+                      [&::-moz-range-thumb]:border-purple-300
+                      [&::-moz-range-thumb]:shadow-lg
+                      [&::-moz-range-thumb]:shadow-black/50
+                      hover:[&::-webkit-slider-thumb]:bg-purple-400
+                      hover:[&::-moz-range-thumb]:bg-purple-400
+                      active:[&::-webkit-slider-thumb]:scale-110
+                      active:[&::-moz-range-thumb]:scale-110
+                      transition-all
+                      touch-none"
                   />
                 </div>
               </div>
@@ -464,8 +589,8 @@ function App() {
 
               {/* Equalizer */}
               {showEqualizer && (
-                <div className="pt-4 border-t border-white/10">
-                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 equalizer-container">
+                <div className="pt-4 border-t border-white/10 equalizer-controls">
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
                     {equalizerBands.map((band, index) => (
                       <div key={band.frequency} className="flex flex-col items-center gap-2">
                         <input
@@ -476,6 +601,7 @@ function App() {
                           value={band.gain}
                           onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
                           className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                          onTouchMove={(e) => e.stopPropagation()}
                         />
                         <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
                       </div>
