@@ -63,13 +63,6 @@ function App() {
     };
   }, []);
 
-
-    document.addEventListener('touchmove', preventScroll, { passive: false });
-    return () => {
-      document.removeEventListener('touchmove', preventScroll);
-    };
-  }, [showEqualizer]);
-
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
       waveformRef.current = WaveSurfer.create({
