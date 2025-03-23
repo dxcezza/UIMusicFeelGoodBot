@@ -63,13 +63,6 @@ function App() {
     };
   }, []);
 
-  // Prevent scroll when adjusting equalizer sliders
-  useEffect(() => {
-    const preventScroll = (e: TouchEvent) => {
-      if (showEqualizer) {
-        e.preventDefault();
-      }
-    };
 
     document.addEventListener('touchmove', preventScroll, { passive: false });
     return () => {
