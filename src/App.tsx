@@ -14,7 +14,6 @@ interface EqualizerBand {
   gain: number;
 }
 
-// Создаем функцию для получения начальных значений эквалайзера
 const getDefaultEqualizerBands = (): EqualizerBand[] => [
   { frequency: 32, gain: 0 },
   { frequency: 64, gain: 0 },
@@ -51,6 +50,18 @@ function App() {
   const playerRef = useRef<HTMLDivElement>(null);
   const isAudioInitialized = useRef<boolean>(false);
   const volumeControlRef = useRef<HTMLDivElement>(null);
+
+  // Инициализация AudioContext при монтировании компонента
+  useEffect(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
 
   // Prevent scroll when adjusting equalizer sliders
   useEffect(() => {
@@ -89,10 +100,16 @@ function App() {
   }, []);
 
   const initializeAudioContext = () => {
-    if (!audioContextRef.current && audioRef.current && !isAudioInitialized.current) {
-      audioContextRef.current = new AudioContext();
-      sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+    if (!isAudioInitialized.current && audioRef.current) {
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
 
+      if (!sourceNodeRef.current) {
+        sourceNodeRef.current = audioContextRef.current!.createMediaElementSource(audioRef.current);
+      }
+
+      // Пересоздаем фильтры
       equalizerNodesRef.current = equalizerBands.map(band => {
         const filter = audioContextRef.current!.createBiquadFilter();
         filter.type = band.frequency <= 32 ? 'lowshelf' : band.frequency >= 16000 ? 'highshelf' : 'peaking';
@@ -102,13 +119,14 @@ function App() {
         return filter;
       });
 
+      // Подключаем фильтры
       sourceNodeRef.current.connect(equalizerNodesRef.current[0]);
       equalizerNodesRef.current.forEach((node, i) => {
         if (i < equalizerNodesRef.current.length - 1) {
           node.connect(equalizerNodesRef.current[i + 1]);
         }
       });
-      equalizerNodesRef.current[equalizerNodesRef.current.length - 1].connect(audioContextRef.current.destination);
+      equalizerNodesRef.current[equalizerNodesRef.current.length - 1].connect(audioContextRef.current!.destination);
       
       isAudioInitialized.current = true;
     }
@@ -153,6 +171,7 @@ function App() {
     setAudioUrl(audioUrl);
     setIsPlaying(true);
 
+    // Инициализируем аудио контекст при первом воспроизведении
     initializeAudioContext();
 
     if (waveformRef.current) {
@@ -173,6 +192,7 @@ function App() {
 
   const togglePlay = async () => {
     if (audioRef.current) {
+      // Инициализируем аудио контекст при необходимости
       initializeAudioContext();
 
       if (audioContextRef.current?.state === 'suspended') {
@@ -356,7 +376,7 @@ function App() {
 
       {/* Fixed Player */}
       {currentTrack && (
-        <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 touch-none">
+        <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10">
           <div className="max-w-6xl mx-auto p-4">
             <div className="flex flex-col gap-4">
               {/* Player Controls */}
@@ -416,7 +436,7 @@ function App() {
                 </div>
                 
                 {/* Volume Control */}
-                <div ref={volumeControlRef} className="flex items-center gap-2 w-full sm:w-32 touch-none">
+                <div ref={volumeControlRef} className="flex items-center gap-2 w-full sm:w-32">
                   <button onClick={toggleMute} className="text-gray-400 hover:text-white transition-colors">
                     {isMuted ? (
                       <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -459,7 +479,7 @@ function App() {
               {/* Equalizer */}
               {showEqualizer && (
                 <div className="pt-4 border-t border-white/10">
-                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 equalizer-container">
                     {equalizerBands.map((band, index) => (
                       <div key={band.frequency} className="flex flex-col items-center gap-2">
                         <input
@@ -469,9 +489,7 @@ function App() {
                           step="0.1"
                           value={band.gain}
                           onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
-                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
-                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
-                      [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
                         />
                         <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
                       </div>
