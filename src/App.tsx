@@ -51,6 +51,21 @@ function App() {
   const isAudioInitialized = useRef<boolean>(false);
   const volumeControlRef = useRef<HTMLDivElement>(null);
 
+  // Prevent scroll when adjusting equalizer sliders
+  useEffect(() => {
+    const preventScroll = (e: TouchEvent) => {
+      if (showEqualizer) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    return () => {
+      document.removeEventListener('touchmove', preventScroll);
+    };
+  }, [showEqualizer]);
+
+
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
       waveformRef.current = WaveSurfer.create({
@@ -337,14 +352,9 @@ function App() {
 
       {/* Fixed Player */}
       {currentTrack && (
-        <div
-          ref={playerRef}
-          {...bind()}
-          className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 touch-none"
-        >
-    {/* Контент плеера */}
-        <div className="max-w-6xl mx-auto p-4">
-          <div className="flex flex-col gap-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 touch-none">
+          <div className="max-w-6xl mx-auto p-4">
+            <div className="flex flex-col gap-4">
               {/* Player Controls */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 {/* Track Info */}
@@ -455,11 +465,11 @@ function App() {
                           step="0.1"
                           value={band.gain}
                           onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
-                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
-                              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
-                              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer
+                          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
                           onTouchMove={(e) => e.stopPropagation()}
-                        />
+                          />
                         <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
                       </div>
                     ))}
