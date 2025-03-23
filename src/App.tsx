@@ -115,13 +115,13 @@ function App() {
   };
 
 const resetEqualizer = () => {
-  // Сбрасываем состояние equalizerBands
-  setEqualizerBands(DEFAULT_EQUALIZER_BANDS);
+  // Обновляем состояние equalizerBands до значений по умолчанию
+  setEqualizerBands([...DEFAULT_EQUALIZER_BANDS]);
 
-  // Сбрасываем значения фильтров
+  // Обновляем значения фильтров
   equalizerNodesRef.current.forEach((node, index) => {
     if (node) {
-      node.gain.value = DEFAULT_EQUALIZER_BANDS[index].gain; // Устанавливаем начальные значения
+      node.gain.setValueAtTime(DEFAULT_EQUALIZER_BANDS[index].gain, audioContextRef.current?.currentTime || 0);
     }
   });
 };
@@ -229,11 +229,11 @@ const resetEqualizer = () => {
     }
 
     const newBands = [...equalizerBands];
-    newBands[index].gain = value; // Обновляем состояние
+    newBands[index].gain = value;
     setEqualizerBands(newBands);
 
     if (equalizerNodesRef.current[index]) {
-      equalizerNodesRef.current[index].gain.value = value; // Применяем новое значение к фильтру
+      equalizerNodesRef.current[index].gain.setValueAtTime(value, audioContextRef.current.currentTime);
     }
   };
 
@@ -468,18 +468,18 @@ const resetEqualizer = () => {
                           min="-12"
                           max="12"
                           step="0.1"
-                          value={band.gain} // Значение берется из состояния
+                          value={band.gain}
                           onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
                           className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
                       [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
                         />
-                      <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
-                    </div>
+                        <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
-                )}
+              )}
             </div>
             
             <audio
