@@ -480,8 +480,8 @@ function App() {
                   
                   <div ref={waveformContainerRef} className="mb-2" />
                   
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <span className="text-xs sm:text-sm text-gray-400 w-8 sm:w-12 text-right">
+                  <div className="flex items-center gap-2 sm:gap-3 px-4">
+                    <span className="text-xs sm:text-sm text-gray-400 w-12 text-right">
                       {formatTime(currentTime)}
                     </span>
                     <input
@@ -516,15 +516,15 @@ function App() {
                         transition-all
                         touch-none"
                     />
-                    <span className="text-xs sm:text-sm text-gray-400 w-8 sm:w-12">
+                    <span className="text-xs sm:text-sm text-gray-400 w-12">
                       {formatTime(duration)}
                     </span>
                   </div>
                 </div>
                 
                 {/* Volume Control */}
-                <div ref={volumeControlRef} className="flex items-center gap-2 w-full sm:w-32 touch-none">
-                  <button onClick={toggleMute} className="text-gray-400 hover:text-white transition-colors">
+                <div ref={volumeControlRef} className="flex items-center gap-2 w-full sm:w-32 md:w-32 px-4 touch-none self-center">
+                  <button onClick={toggleMute} className="text-gray-400 hover:text-white transition-colors shrink-0">
                     {isMuted ? (
                       <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />
                     ) : (
@@ -539,7 +539,7 @@ function App() {
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
                     onTouchMove={(e) => e.stopPropagation()}
-                    className="flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer
+                    className="w-full min-w-0 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer
                       [&::-webkit-slider-thumb]:appearance-none 
                       [&::-webkit-slider-thumb]:w-6 
                       [&::-webkit-slider-thumb]:h-6 
