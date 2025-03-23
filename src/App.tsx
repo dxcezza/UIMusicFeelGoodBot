@@ -51,20 +51,6 @@ function App() {
   const isAudioInitialized = useRef<boolean>(false);
   const volumeControlRef = useRef<HTMLDivElement>(null);
 
-  // Prevent scroll when adjusting equalizer sliders
-  useEffect(() => {
-    const preventScroll = (e: TouchEvent) => {
-      if (showEqualizer) {
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('touchmove', preventScroll, { passive: false });
-    return () => {
-      document.removeEventListener('touchmove', preventScroll);
-    };
-  }, [showEqualizer]);
-  
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
       waveformRef.current = WaveSurfer.create({
