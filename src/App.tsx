@@ -229,11 +229,11 @@ const resetEqualizer = () => {
     }
 
     const newBands = [...equalizerBands];
-    newBands[index].gain = value;
+    newBands[index].gain = value; // Обновляем состояние
     setEqualizerBands(newBands);
 
     if (equalizerNodesRef.current[index]) {
-      equalizerNodesRef.current[index].gain.value = value;
+      equalizerNodesRef.current[index].gain.value = value; // Применяем новое значение к фильтру
     }
   };
 
