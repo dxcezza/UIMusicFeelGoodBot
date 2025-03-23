@@ -463,28 +463,28 @@ function App() {
 
               {/* Equalizer */}
               {showEqualizer && (
-  <div className="pt-4 border-t border-white/10">
-    <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-      {equalizerBands.map((band, index) => (
-        <div key={band.frequency} className="flex flex-col items-center gap-2">
-          <input
-            type="range"
-            min="-12"
-            max="12"
-            step="0.1"
-            value={band.gain} // Значение берется из состояния
-            onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
-            className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
+                <div className="pt-4 border-t border-white/10">
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {equalizerBands.map((band, index) => (
+                      <div key={band.frequency} className="flex flex-col items-center gap-2">
+                        <input
+                          type="range"
+                          min="-12"
+                          max="12"
+                          step="0.1"
+                          value={band.gain} // Значение берется из состояния
+                          onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
+                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
                       [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
-          />
-          <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-            </div>
+                      />
+                      <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
+                    </div>
+                    ))}
+                  </div>
+                </div>
+                )}
+              </div>
             
             <audio
               ref={audioRef}
