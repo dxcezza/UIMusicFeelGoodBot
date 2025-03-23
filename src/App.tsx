@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Music2, Download, Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Loader2, AudioWaveform as Waveform, RotateCcw } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
-import { useGesture } from '@use-gesture/react';
 
 interface Track {
   videoId: string;
@@ -29,7 +28,6 @@ const DEFAULT_EQUALIZER_BANDS: EqualizerBand[] = [
 ];
 
 function App() {
-  const isMobileDevice = 'ontouchstart' in window || window.matchMedia('(pointer: coarse)').matches;
   const [searchQuery, setSearchQuery] = useState('');
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
@@ -66,30 +64,6 @@ function App() {
       document.removeEventListener('touchmove', preventScroll);
     };
   }, [showEqualizer]);
-
-  // Handle swipe gesture for equalizer
- const bind = useGesture(
-  {
-    onDrag: ({ offset: [, my], direction: [, dy] }) => {
-      if (!isMobileDevice) return; // Отключаем жесты на компьютерах
-
-      if (Math.abs(my) > 50) { // Минимальное расстояние для срабатывания жеста
-        if (dy < 0) {
-          setShowEqualizer(true); // Показываем эквалайзер при свайпе вверх
-        } else if (dy > 0 && showEqualizer) {
-          setShowEqualizer(false); // Скрываем эквалайзер при свайпе вниз, если он уже открыт
-        }
-      }
-    },
-  },
-  {
-    drag: {
-      axis: 'y', // Ограничиваем движение по вертикальной оси
-      filterTaps: true, // Игнорируем короткие тапы
-      threshold: 10, // Минимальное расстояние для начала drag-жеста
-    },
-  }
-);
   
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
@@ -377,10 +351,14 @@ function App() {
 
       {/* Fixed Player */}
       {currentTrack && (
-        <div {...(isMobileDevice ? bind() : {})} className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10">
+        <div
+          ref={playerRef}
+          {...bind()}
+          className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 touch-none"
+        >
     {/* Контент плеера */}
         <div className="max-w-6xl mx-auto p-4">
-        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
               {/* Player Controls */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 {/* Track Info */}
