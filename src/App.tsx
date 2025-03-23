@@ -41,7 +41,6 @@ function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [equalizerBands, setEqualizerBands] = useState<EqualizerBand[]>(DEFAULT_EQUALIZER_BANDS);
-  const [showEqualizer, setShowEqualizer] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
