@@ -68,7 +68,7 @@ function App() {
   }, [showEqualizer]);
 
   // Handle swipe gesture for equalizer
-  const bind = useGesture(
+ const bind = useGesture(
   {
     onDrag: ({ offset: [, my], direction: [, dy] }) => {
       if (!isMobileDevice) return; // Отключаем жесты на компьютерах
@@ -77,7 +77,7 @@ function App() {
         if (dy < 0) {
           setShowEqualizer(true); // Показываем эквалайзер при свайпе вверх
         } else if (dy > 0 && showEqualizer) {
-          setShowEqualizer(false); // Скрываем эквалайзер при свайпе вниз
+          setShowEqualizer(false); // Скрываем эквалайзер при свайпе вниз, если он уже открыт
         }
       }
     },
@@ -377,11 +377,7 @@ function App() {
 
       {/* Fixed Player */}
       {currentTrack && (
-        <div 
-          ref={playerRef}
-          {...bind()}
-          className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10 touch-none"
-        >
+        <div {...(isMobileDevice ? bind() : {})} className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-white/10">
           <div className="max-w-6xl mx-auto p-4">
             <div className="flex flex-col gap-4">
               {/* Player Controls */}
