@@ -29,6 +29,7 @@ const DEFAULT_EQUALIZER_BANDS: EqualizerBand[] = [
 ];
 
 function App() {
+  const isMobileDevice = 'ontouchstart' in window || window.matchMedia('(pointer: coarse)').matches;
   const [searchQuery, setSearchQuery] = useState('');
   const [tracks, setTracks] = useState<Track[]>([]);
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
@@ -68,25 +69,27 @@ function App() {
 
   // Handle swipe gesture for equalizer
   const bind = useGesture(
-    {
-      onDrag: ({ offset: [, my], direction: [, dy] }) => {
-        if (Math.abs(my) > 50) { // Минимальное расстояние для срабатывания жеста
-          if (dy < 0) {
-            setShowEqualizer(true); // Показываем эквалайзер при свайпе вверх
-          } else if (dy > 0 && showEqualizer) {
-            setShowEqualizer(false); // Скрываем эквалайзер при свайпе вниз
-          }
+  {
+    onDrag: ({ offset: [, my], direction: [, dy] }) => {
+      if (!isMobileDevice) return; // Отключаем жесты на компьютерах
+
+      if (Math.abs(my) > 50) { // Минимальное расстояние для срабатывания жеста
+        if (dy < 0) {
+          setShowEqualizer(true); // Показываем эквалайзер при свайпе вверх
+        } else if (dy > 0 && showEqualizer) {
+          setShowEqualizer(false); // Скрываем эквалайзер при свайпе вниз
         }
-      },
+      }
     },
-    {
-      drag: {
-        axis: 'y', // Ограничиваем движение по вертикальной оси
-        filterTaps: true, // Игнорируем короткие тапы
-        threshold: 10, // Минимальное расстояние для начала drag-жеста
-      },
-    }
-  );
+  },
+  {
+    drag: {
+      axis: 'y', // Ограничиваем движение по вертикальной оси
+      filterTaps: true, // Игнорируем короткие тапы
+      threshold: 10, // Минимальное расстояние для начала drag-жеста
+    },
+  }
+);
   
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
