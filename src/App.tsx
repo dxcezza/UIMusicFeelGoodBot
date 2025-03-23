@@ -41,6 +41,7 @@ function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [equalizerBands, setEqualizerBands] = useState<EqualizerBand[]>(DEFAULT_EQUALIZER_BANDS);
+  const [showEqualizer, setShowEqualizer] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -68,21 +69,26 @@ function App() {
 
   // Handle swipe gesture for equalizer
   const bind = useGesture(
-  {
-    onDrag: ({ offset: [, my], delta: [, dy] }) => { // Используем offset и delta вместо movement и direction
-      if (Math.abs(my) > 50) {
-        setShowEqualizer(dy < 0); // Показываем/скрываем эквалайзер
-      }
+    {
+      onDrag: ({ offset: [, my], direction: [, dy] }) => {
+        if (Math.abs(my) > 50) { // Минимальное расстояние для срабатывания жеста
+          if (dy < 0) {
+            setShowEqualizer(true); // Показываем эквалайзер при свайпе вверх
+          } else if (dy > 0 && showEqualizer) {
+            setShowEqualizer(false); // Скрываем эквалайзер при свайпе вниз
+          }
+        }
+      },
     },
-  },
-  {
-    drag: {
-      axis: 'y', // Ограничиваем движение по вертикальной оси
-      filterTaps: true, // Игнорируем короткие тапы
-      threshold: 10, // Минимальное расстояние для начала drag-жеста
-    },
-  }
-);
+    {
+      drag: {
+        axis: 'y', // Ограничиваем движение по вертикальной оси
+        filterTaps: true, // Игнорируем короткие тапы
+        threshold: 10, // Минимальное расстояние для начала drag-жеста
+      },
+    }
+  );
+  
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
       waveformRef.current = WaveSurfer.create({
@@ -486,7 +492,9 @@ function App() {
                           step="0.1"
                           value={band.gain}
                           onChange={(e) => handleEqualizerChange(index, parseFloat(e.target.value))}
-                          className="h-20 sm:h-24 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                          className="vertical-slider h-48 w-2 bg-gray-600 rounded-lg appearance-none cursor-pointer 
+                              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
+                              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
                           onTouchMove={(e) => e.stopPropagation()}
                         />
                         <span className="text-xs text-gray-400">{formatFrequency(band.frequency)}</span>
