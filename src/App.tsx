@@ -68,22 +68,21 @@ function App() {
 
   // Handle swipe gesture for equalizer
   const bind = useGesture(
-    {
-      onDrag: ({ movement: [_, my], direction: [_, dy] }) => {
-        if (Math.abs(my) > 50) {
-          setShowEqualizer(dy < 0);
-        }
-      },
+  {
+    onDrag: ({ offset: [, my], delta: [, dy] }) => { // Используем offset и delta вместо movement и direction
+      if (Math.abs(my) > 50) {
+        setShowEqualizer(dy < 0); // Показываем/скрываем эквалайзер
+      }
     },
-    {
-      drag: {
-        axis: 'y',
-        filterTaps: true,
-        threshold: 10,
-      },
-    }
-  );
-
+  },
+  {
+    drag: {
+      axis: 'y', // Ограничиваем движение по вертикальной оси
+      filterTaps: true, // Игнорируем короткие тапы
+      threshold: 10, // Минимальное расстояние для начала drag-жеста
+    },
+  }
+);
   useEffect(() => {
     if (waveformContainerRef.current && audioRef.current) {
       waveformRef.current = WaveSurfer.create({
