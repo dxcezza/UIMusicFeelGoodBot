@@ -1,3 +1,58 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Вертикальный слайдер */
+.vertical-slider {
+  writing-mode: vertical-lr; /* Изменение направления текста и оси */
+  transform: rotate(180deg); /* Поворот слайдера на 180 градусов для корректной работы */
+}
+
+/* Стили ползунка (thumb) */
+.vertical-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px; /* Размер ползунка */
+  height: 20px;
+  background-color: #6a2c70; /* Цвет ползунка */
+  border-radius: 50%; /* Круглый ползунок */
+  cursor: pointer;
+}
+
+/* Для Firefox */
+.vertical-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background-color: #6a2c70;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* Для IE/Edge */
+.vertical-slider::-ms-thumb {
+  width: 20px;
+  height: 20px;
+  background-color: #6a2c70;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* Для Firefox */
+.vertical-slider::-moz-range-track {
+  width: 2px;
+  height: 100%;
+  background-color: #dcdcdc;
+  border-radius: 1px;
+}
+
+/* Для IE/Edge */
+.vertical-slider::-ms-track {
+  width: 2px;
+  height: 100%;
+  background-color: #dcdcdc;
+  border-radius: 1px;
+  border: none;
+  color: transparent;
+  background: transparent;
+}
