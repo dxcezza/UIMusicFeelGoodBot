@@ -1,9 +1,8 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template, send_from_directory
 import os
 import logging
 from spotdl import Spotdl
 from spotdl.types.song import Song
-from spotdl.utils.search import get_search_results
 import asyncio
 import nest_asyncio
 import requests
@@ -13,7 +12,7 @@ from urllib3.util.retry import Retry
 # Применяем патч для работы с асинхронным кодом
 nest_asyncio.apply()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='dist', static_url_path='')
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
@@ -24,29 +23,33 @@ TEMP_DIR = 'temp'
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
-# Настройка HTTP-сессии с повторными попытками и увеличенным таймаутом
+# Настройка HTTP-сессии с повторными попытками
 session = requests.Session()
 retry_strategy = Retry(
-    total=3,  # количество повторных попыток
-    backoff_factor=1,  # фактор задержки между попытками
-    status_forcelist=[429, 500, 502, 503, 504]  # коды ошибок для повторных попыток
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504]
 )
 adapter = HTTPAdapter(max_retries=retry_strategy)
 session.mount("https://", adapter)
 session.mount("http://", adapter)
 
-# Создаем экземпляр spotdl с учетными данными Spotify
+# Создаем экземпляр spotdl
 spotdl_client = Spotdl(
     client_id='3ca65da03635428ea7cb29981ee7220a',
     client_secret='e9e3c7a8e864403abfa9b1443d2c0017',
+    session=session,
+    timeout=15
 )
 
-# Настраиваем параметры скачивания отдельно
+# Настраиваем параметры скачивания
 spotdl_client.downloader.output = TEMP_DIR
 spotdl_client.downloader.output_format = 'mp3'
 spotdl_client.downloader.threads = 1
 
-# ... existing code ...
+@app.route("/")
+def index():
+    return send_from_directory(app.static_folder, 'index.html')
 
 async def download_track(song):
     """Асинхронная функция для скачивания трека"""
@@ -61,14 +64,14 @@ def get_audio(track_url):
     try:
         logger.debug(f"Processing track URL: {track_url}")
 
-        # Формируем полный URL Spotify
-        full_track_url = f"https://open.spotify.com/track/{track_url}"
-        
         # Проверяем кэш
         audio_path = os.path.join(TEMP_DIR, f"{track_url}.mp3")
         if os.path.exists(audio_path):
             logger.debug(f"Audio file already exists: {audio_path}")
             return send_file(audio_path, mimetype='audio/mp3')
+
+        # Формируем полный URL Spotify
+        full_track_url = f"https://open.spotify.com/track/{track_url}"
 
         # Получаем информацию о треке
         song = Song.from_url(full_track_url)
@@ -103,8 +106,6 @@ def get_audio(track_url):
         logger.error(f"Error processing track URL {track_url}: {e}")
         return jsonify({'error': str(e)}), 500
 
-# ... rest of the code ...
-
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
     query = request.args.get('query')
@@ -129,4 +130,5 @@ def search_tracks():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(port=3000)
+    port = int(os.environ.get('PORT', 3000))
+    app.run(host='0.0.0.0', port=port)
