@@ -19,7 +19,7 @@ TEMP_DIR = 'temp'
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
-# Путь к файлу cookies (замените на путь к вашему файлу cookies.txt)
+# Путь к файлу cookies
 COOKIES_FILE = 'cookies.txt'
 
 @app.route("/")
