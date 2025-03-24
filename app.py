@@ -24,6 +24,10 @@ spotdl_client = Spotdl(
     client_secret='e9e3c7a8e864403abfa9b1443d2c0017'
 )
 
+@app.route("/")
+def index():
+    return send_from_directory(app.static_folder, 'index.html')
+    
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
     query = request.args.get('query')
