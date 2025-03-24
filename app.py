@@ -37,9 +37,7 @@ session.mount("http://", adapter)
 # Создаем экземпляр spotdl
 spotdl_client = Spotdl(
     client_id='3ca65da03635428ea7cb29981ee7220a',
-    client_secret='e9e3c7a8e864403abfa9b1443d2c0017',
-    session=session,
-    timeout=15
+    client_secret='e9e3c7a8e864403abfa9b1443d2c0017'
 )
 
 # Настраиваем параметры скачивания
