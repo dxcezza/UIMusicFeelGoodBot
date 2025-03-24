@@ -1,11 +1,9 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template, send_from_directory
+from ytmusicapi import YTMusic
 import os
+import yt_dlp
+import ffmpeg
 import logging
-import asyncio
-from spotdl import Spotdl
-from spotdl.types.song import Song
-from spotdl.utils.search import get_search_results
-# Применяем патч для работы с асинхронным кодом
 
 app = Flask(__name__, static_folder='dist', static_url_path='')
 
@@ -13,21 +11,21 @@ app = Flask(__name__, static_folder='dist', static_url_path='')
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Инициализация ytmusicapi
+ytmusic = YTMusic()
+
 # Настройка временной директории
 TEMP_DIR = 'temp'
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
-# Создаем экземпляр spotdl
-spotdl_client = Spotdl(
-    client_id='3ca65da03635428ea7cb29981ee7220a',
-    client_secret='e9e3c7a8e864403abfa9b1443d2c0017'
-)
+# Путь к файлу cookies
+COOKIES_FILE = 'cookies.txt'
 
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, 'index.html')
-    
+
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
     query = request.args.get('query')
@@ -35,53 +33,63 @@ def search_tracks():
         return jsonify({'error': 'Запрос не указан'}), 400
 
     try:
-        # Ищем треки через spotdl
-        search_results = asyncio.run(get_search_results(query))
+        results = ytmusic.search(query, filter='songs', limit=10)
         tracks = [
             {
-                'title': song.name,
-                'artist': song.artists[0],  # Берем первого исполнителя
-                'videoId': song.url.split('/')[-1].split('?')[0],  # ID трека на Spotify
-                'thumbnail': song.cover_url  # URL обложки
+                'title': item['title'],
+                'artist': item['artists'][0]['name'] if item['artists'] else 'Unknown',
+                'videoId': item['videoId'],
+                'thumbnail': item['thumbnails'][-1]['url']  # Берем последнюю (самую большую) миниатюру
             }
-            for song in search_results
+            for item in results
         ]
         return jsonify(tracks)
     except Exception as e:
         logger.error(f"Error searching tracks: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/get_audio/<track_id>', methods=['GET'])
-def get_audio(track_id):
+@app.route('/api/get_audio/<video_id>', methods=['GET'])
+def get_audio(video_id):
     try:
-        logger.debug(f"Processing track URL: {track_id}")
+        logger.debug(f"Processing video ID: {video_id}")
 
-        # Проверяем кэш
-        audio_path = os.path.join(TEMP_DIR, f"{track_id}.mp3")
+        # Проверяем, существует ли аудиофайл в кэше
+        audio_path = os.path.join(TEMP_DIR, f"{video_id}.mp3")
         if os.path.exists(audio_path):
             logger.debug(f"Audio file already exists: {audio_path}")
             return send_file(audio_path, mimetype='audio/mp3')
 
-        # Скачиваем трек через spotdl
-        async def download_song():
-            song = await Song.from_url(f"https://open.spotify.com/track/{track_id}")
-            result = await spotdl_client.download(song)
-            return result
+        # URL видео
+        video_url = f"https://youtube.com/watch?v={video_id}"
 
-        # Запускаем асинхронную функцию в синхронном контексте
-        result = asyncio.run(download_song())
+        # Настройки yt-dlp для скачивания только аудио
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': os.path.join(TEMP_DIR, f'{video_id}.%(ext)s'),
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'cookiefile': COOKIES_FILE,  # Передача файла cookies
+            'retries': 3,  # Количество повторных попыток
+            'fragment_retries': 10,  # Количество попыток при скачивании частей файла
+            'continue_dl': True,  # Возобновление скачивания при разрыве
+        }
 
-        if result is None or not os.path.exists(result):
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            logger.debug(f"Downloading audio from: {video_url}")
+            ydl.download([video_url])
+
+        # Проверяем, что файл успешно создан
+        if not os.path.exists(audio_path):
             return jsonify({'error': 'Не удалось скачать аудио'}), 500
 
-        # Копируем файл в временную директорию
-        output_file = os.path.join(TEMP_DIR, f"{track_id}.mp3")
-        os.rename(result, output_file)
-
-        return send_file(output_file, mimetype='audio/mp3')
+        # Отправляем аудио файл
+        return send_file(audio_path, mimetype='audio/mp3')
 
     except Exception as e:
-        logger.error(f"Error processing track URL {track_id}: {e}")
+        logger.error(f"Error processing video ID {video_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
