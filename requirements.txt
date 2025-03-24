@@ -1,6 +1,4 @@
 Flask==3.0.2
 ytmusicapi==1.5.2
-nest-asyncio==1.6.0
+yt-dlp==2024.3.10
 ffmpeg-python==0.2.0
-spotdl==4.2.11
-asyncio==3.4.3
