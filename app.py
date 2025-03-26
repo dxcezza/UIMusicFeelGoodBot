@@ -1,12 +1,11 @@
-from flask import Flask, request, jsonify, send_file, render_template, send_from_directory
+from flask import Flask, request, jsonify, send_file
 import os
 import logging
 import subprocess
 from pathlib import Path
 from ytmusicapi import YTMusic
-import ffmpeg
 
-app = Flask(__name__, static_folder='dist', static_url_path='')
+app = Flask(__name__)
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
@@ -22,7 +21,7 @@ ytmusic = YTMusic()
 
 @app.route("/")
 def index():
-    return send_from_directory(app.static_folder, 'index.html')
+    return "Аудиобиблиотека"
 
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
@@ -64,14 +63,15 @@ def get_audio(track_id):
         # Формируем URL трека YouTube
         track_url = f"https://music.youtube.com/watch?v={track_id}"
         
-        # Скачиваем трек через spotdl
+        # Используем yt-dlp напрямую вместо spotdl
+        output_template = os.path.join(TEMP_DIR, f"{track_id}.%(ext)s")
         cmd = [
-            'spotdl',
-            track_url,
-            '--output', TEMP_DIR,
-            '--format', 'mp3',
-            '--bitrate', '320k',
-            '--threads', '1'
+            'yt-dlp',
+            '-x',  # извлечь аудио
+            '--audio-format', 'mp3',
+            '--audio-quality', '0',  # лучшее качество
+            '-o', output_template,
+            track_url
         ]
         
         logger.debug(f"Running command: {' '.join(cmd)}")
@@ -83,18 +83,10 @@ def get_audio(track_id):
         
         logger.debug(f"Download output: {result.stdout}")
 
-        # Ищем скачанный файл
-        downloaded_files = list(Path(TEMP_DIR).glob('*.mp3'))
-        
-        # Проверяем, что список файлов не пуст
-        if not downloaded_files:
-            logger.error(f"No MP3 files found in {TEMP_DIR} after download")
+        # Проверяем, что файл существует
+        if not os.path.exists(audio_path):
+            logger.error(f"Expected file not found: {audio_path}")
             return jsonify({'error': 'Файл не был скачан'}), 500
-            
-        latest_file = max(downloaded_files, key=os.path.getctime)
-        
-        # Переименовываем файл для кэширования
-        os.rename(latest_file, audio_path)
         
         return send_file(audio_path, mimetype='audio/mp3')
 
@@ -103,31 +95,23 @@ def get_audio(track_id):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Проверяем наличие spotdl
+    # Проверяем наличие yt-dlp
     try:
-        subprocess.run(['spotdl', '--version'], capture_output=True)
+        subprocess.run(['yt-dlp', '--version'], capture_output=True)
     except FileNotFoundError:
-        logger.error("spotdl не установлен. Установите его командой: pip install spotdl")
+        logger.error("yt-dlp не установлен. Установите его командой: pip install yt-dlp")
         exit(1)
     
-    # Проверяем и устанавливаем ffmpeg через spotdl
+    # Проверяем наличие ffmpeg
     try:
-        logger.info("Проверка и установка ffmpeg через spotdl...")
-        result = subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, text=True)
+        logger.info("Проверка наличия ffmpeg...")
+        result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
         if result.returncode != 0:
-            logger.error(f"Ошибка при установке ffmpeg через spotdl: {result.stderr}")
-            logger.info("Попытка проверки наличия ffmpeg в системе...")
-            # Проверяем, установлен ли ffmpeg в системе
-            ffmpeg_check = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
-            if ffmpeg_check.returncode == 0:
-                logger.info("ffmpeg уже установлен в системе, продолжаем работу")
-            else:
-                logger.error("ffmpeg не найден. Пожалуйста, установите ffmpeg вручную")
-                exit(1)
-        else:
-            logger.info("ffmpeg успешно установлен через spotdl")
+            logger.error("ffmpeg не найден. Пожалуйста, установите ffmpeg")
+            exit(1)
+        logger.info("ffmpeg найден")
     except Exception as e:
-        logger.error(f"Ошибка при установке ffmpeg: {e}")
+        logger.error(f"Ошибка при проверке ffmpeg: {e}")
         logger.error("Пожалуйста, установите ffmpeg вручную")
         exit(1)
         
