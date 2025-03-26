@@ -54,9 +54,6 @@ function App() {
   const minSwipeDistance = 50; // минимальное расстояние для свайпа
 
   const apiUrl = process.env.REACT_APP_API_URL; // Используем переменную окружения для базового URL API
-  if (!apiUrl) {
-    throw new Error('REACT_APP_API_URL не установлена');
-  }
   
   // Prevent scroll when adjusting equalizer sliders
   useEffect(() => {
