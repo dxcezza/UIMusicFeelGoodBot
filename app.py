@@ -21,6 +21,7 @@ app = Flask(__name__, static_folder='dist', static_url_path='')
 # Инициализация YTMusic API
 ytmusic = YTMusic()
 
+
 # Папка для сохранения скачанных файлов
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -28,6 +29,10 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 @app.route("/")
 def index():
     return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok'}), 200
 
 # Функция для генерации пути к файлу на основе track_id
 def get_file_path(track_id):
