@@ -109,8 +109,7 @@ def get_audio(track_id):
             
             # Скачиваем трек через spotdl
             cmd = [
-                'spotdl',
-                '--song', track_url,
+                'spotdl', track_url,
                 '--output', '-',  # Выводим данные в stdout
                 '--format', 'mp3',
                 '--bitrate', '128k'
