@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from model import Track, Base
 from dotenv import load_dotenv
 from ytmusicapi import YTMusic
+import asyncio
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -26,9 +27,10 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# Инициализация YTMusic
-ytmusic = YTMusic()
+# Генерация таблицы
+Base.metadata.create_all(engine)
 
+# Подключение к базе данных
 def get_db():
     db = SessionLocal()
     try:
@@ -48,6 +50,7 @@ def search_tracks():
 
     try:
         # Используем ytmusicapi для поиска
+        ytmusic = YTMusic()
         search_results = ytmusic.search(query, filter='songs', limit=10)
         
         # Форматируем результаты
@@ -123,7 +126,7 @@ def get_audio(track_id):
 
         audio_data = asyncio.run(download_song())
 
-        # Получаем информацию о треке через ytmusicapi (для метаданных)
+        # Получаем информацию о треке через ytmusicapi
         track_info = ytmusic.get_song(track_id)
         if not track_info:
             return jsonify({'error': 'Трек не найден'}), 404
