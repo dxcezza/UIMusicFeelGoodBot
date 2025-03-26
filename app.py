@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from ytmusicapi import YTMusic
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='dist', static_url_path='')
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
@@ -21,7 +21,7 @@ ytmusic = YTMusic()
 
 @app.route("/")
 def index():
-    return "Аудиобиблиотека"
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
