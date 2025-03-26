@@ -64,6 +64,9 @@ def get_audio(track_id):
         # Формируем URL трека YouTube
         track_url = f"https://music.youtube.com/watch?v={track_id}"
         
+        # Получаем список файлов до скачивания
+        files_before = set(os.listdir(TEMP_DIR))
+        
         # Скачиваем трек через spotdl
         cmd = [
             'spotdl',
@@ -80,27 +83,37 @@ def get_audio(track_id):
         if result.returncode != 0:
             logger.error(f"Download error: {result.stderr}")
             return jsonify({'error': 'Ошибка скачивания'}), 500
-        
-        logger.debug(f"Download output: {result.stdout}")
 
-        # Ищем скачанный файл
-        downloaded_files = list(Path(TEMP_DIR).glob('*.mp3'))
+        # Получаем список файлов после скачивания
+        files_after = set(os.listdir(TEMP_DIR))
         
-        # Проверяем, что список файлов не пуст
-        if not downloaded_files:
-            logger.error(f"No MP3 files found in {TEMP_DIR} after download")
+        # Находим новые файлы
+        new_files = files_after - files_before
+        logger.debug(f"New files: {new_files}")
+        
+        if not new_files:
+            logger.error("No new files found after download")
             return jsonify({'error': 'Файл не был скачан'}), 500
             
-        latest_file = max(downloaded_files, key=os.path.getctime)
+        # Ищем среди новых файлов MP3
+        mp3_files = [f for f in new_files if f.endswith('.mp3')]
+        
+        if not mp3_files:
+            logger.error("No MP3 files found among new files")
+            return jsonify({'error': 'MP3 файл не найден'}), 500
+            
+        # Берем первый найденный MP3 файл
+        downloaded_file = os.path.join(TEMP_DIR, mp3_files[0])
         
         # Переименовываем файл для кэширования
-        os.rename(latest_file, audio_path)
+        os.rename(downloaded_file, audio_path)
         
         return send_file(audio_path, mimetype='audio/mp3')
 
     except Exception as e:
         logger.error(f"Error processing track ID {track_id}: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     # Проверяем наличие spotdl
@@ -113,10 +126,22 @@ if __name__ == '__main__':
     # Проверяем и устанавливаем ffmpeg через spotdl
     try:
         logger.info("Проверка и установка ffmpeg через spotdl...")
-        subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, check=True)
-        logger.info("ffmpeg успешно установлен")
-    except subprocess.CalledProcessError as e:
+        result = subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"Ошибка при установке ffmpeg через spotdl: {result.stderr}")
+            logger.info("Попытка проверки наличия ffmpeg в системе...")
+            # Проверяем, установлен ли ffmpeg в системе
+            ffmpeg_check = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
+            if ffmpeg_check.returncode == 0:
+                logger.info("ffmpeg уже установлен в системе, продолжаем работу")
+            else:
+                logger.error("ffmpeg не найден. Пожалуйста, установите ffmpeg вручную")
+                exit(1)
+        else:
+            logger.info("ffmpeg успешно установлен через spotdl")
+    except Exception as e:
         logger.error(f"Ошибка при установке ffmpeg: {e}")
+        logger.error("Пожалуйста, установите ffmpeg вручную")
         exit(1)
         
     port = int(os.environ.get('PORT', 3000))
