@@ -9,6 +9,7 @@ from model import Track, Base
 from dotenv import load_dotenv
 from ytmusicapi import YTMusic
 import asyncio
+from spotdl.types.song import Song
 
 # Загружаем переменные окружения
 load_dotenv()
