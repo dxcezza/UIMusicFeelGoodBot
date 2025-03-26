@@ -22,7 +22,7 @@ ytmusic = YTMusic()
 
 @app.route("/")
 def index():
-    return "Аудиобиблиотека"
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
