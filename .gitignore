@@ -1,0 +1,59 @@
+# Переменные окружения
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Виртуальное окружение
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Временные файлы
+temp/
+tmp/
+*.mp3
+*.wav
+*.m4a
+
+# Логи
+*.log
+logs/
+
+# База данных
+*.db
+*.sqlite3
+*.sqlite
+
+# Кэш
+.cache/
+.pytest_cache/ 
