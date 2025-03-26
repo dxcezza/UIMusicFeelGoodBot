@@ -1,11 +1,12 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template, send_from_directory
 import os
 import logging
 import subprocess
 from pathlib import Path
 from ytmusicapi import YTMusic
+import ffmpeg
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='dist', static_url_path='')
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
@@ -93,13 +94,6 @@ def get_audio(track_id):
         logger.error(f"Error processing track ID {track_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    # Проверяем наличие spotdl
-    try:
-        subprocess.run(['spotdl', '--version'], capture_output=True)
-    except FileNotFoundError:
-        logger.error("spotdl не установлен. Установите его командой: pip install spotdl")
-        exit(1)
-        
+if __name__ == '__main__': 
     port = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=port)
