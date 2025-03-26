@@ -80,9 +80,17 @@ def get_audio(track_id):
         if result.returncode != 0:
             logger.error(f"Download error: {result.stderr}")
             return jsonify({'error': 'Ошибка скачивания'}), 500
+        
+        logger.debug(f"Download output: {result.stdout}")
 
         # Ищем скачанный файл
         downloaded_files = list(Path(TEMP_DIR).glob('*.mp3'))
+        
+        # Проверяем, что список файлов не пуст
+        if not downloaded_files:
+            logger.error(f"No MP3 files found in {TEMP_DIR} after download")
+            return jsonify({'error': 'Файл не был скачан'}), 500
+            
         latest_file = max(downloaded_files, key=os.path.getctime)
         
         # Переименовываем файл для кэширования
@@ -93,7 +101,6 @@ def get_audio(track_id):
     except Exception as e:
         logger.error(f"Error processing track ID {track_id}: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 if __name__ == '__main__':
     # Проверяем наличие spotdl
@@ -106,22 +113,10 @@ if __name__ == '__main__':
     # Проверяем и устанавливаем ffmpeg через spotdl
     try:
         logger.info("Проверка и установка ffmpeg через spotdl...")
-        result = subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error(f"Ошибка при установке ffmpeg через spotdl: {result.stderr}")
-            logger.info("Попытка проверки наличия ffmpeg в системе...")
-            # Проверяем, установлен ли ffmpeg в системе
-            ffmpeg_check = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
-            if ffmpeg_check.returncode == 0:
-                logger.info("ffmpeg уже установлен в системе, продолжаем работу")
-            else:
-                logger.error("ffmpeg не найден. Пожалуйста, установите ffmpeg вручную")
-                exit(1)
-        else:
-            logger.info("ffmpeg успешно установлен через spotdl")
-    except Exception as e:
+        subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, check=True)
+        logger.info("ffmpeg успешно установлен")
+    except subprocess.CalledProcessError as e:
         logger.error(f"Ошибка при установке ffmpeg: {e}")
-        logger.error("Пожалуйста, установите ffmpeg вручную")
         exit(1)
         
     port = int(os.environ.get('PORT', 3000))
