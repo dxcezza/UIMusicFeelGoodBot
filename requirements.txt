@@ -4,4 +4,4 @@ ffmpeg-python==0.2.0
 spotdl==4.2.11
 pathlib==1.0.1
 ffmpeg==1.4
-SQLAlchemy=2.0.39
+SQLAlchemy==2.0.39
