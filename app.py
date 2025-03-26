@@ -25,6 +25,10 @@ ytmusic = YTMusic()
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+@app.route("/")
+def index():
+    return send_from_directory(app.static_folder, 'index.html')
+
 # Функция для генерации пути к файлу на основе track_id
 def get_file_path(track_id):
     # Ожидаемое имя файла в формате <track_id>.mp3
