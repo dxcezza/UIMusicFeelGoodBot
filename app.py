@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from model import Track, Base
 from dotenv import load_dotenv
+from ytmusicapi import YTMusic
 
 # Загружаем переменные окружения
 load_dotenv()
