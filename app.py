@@ -4,6 +4,7 @@ import os
 import yt_dlp
 from ytmusicapi import YTMusic
 import logging
+from flask_cors import CORS
 
 # Настройка логгирования
 logging.basicConfig(
@@ -17,6 +18,8 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 app = Flask(__name__, static_folder='dist', static_url_path='')
+
+CORS(app, resources={r"/api/*": {"origins": "https://ui-music-feel-good-bot.vercel.app"}})  # Разрешаем только ваш фронтенд
 
 # Инициализация YTMusic API
 ytmusic = YTMusic()
