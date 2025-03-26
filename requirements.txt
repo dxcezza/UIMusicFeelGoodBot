@@ -5,3 +5,4 @@ spotdl==4.2.11
 pathlib==1.0.1
 ffmpeg==1.4
 SQLAlchemy==2.0.39
+dotenv==0.9.9
