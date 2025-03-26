@@ -94,6 +94,21 @@ def get_audio(track_id):
         logger.error(f"Error processing track ID {track_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 if __name__ == '__main__': 
+    try:
+        subprocess.run(['spotdl', '--version'], capture_output=True)
+    except FileNotFoundError:
+        logger.error("spotdl не установлен. Установите его командой: pip install spotdl")
+        exit(1)
+    
+    # Проверяем и устанавливаем ffmpeg через spotdl
+    try:
+        logger.info("Проверка и установка ffmpeg через spotdl...")
+        subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, check=True)
+        logger.info("ffmpeg успешно установлен")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Ошибка при установке ffmpeg: {e}")
+        exit(1)
     port = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=port)
