@@ -80,9 +80,17 @@ def get_audio(track_id):
         if result.returncode != 0:
             logger.error(f"Download error: {result.stderr}")
             return jsonify({'error': 'Ошибка скачивания'}), 500
+        
+        logger.debug(f"Download output: {result.stdout}")
 
         # Ищем скачанный файл
         downloaded_files = list(Path(TEMP_DIR).glob('*.mp3'))
+        
+        # Проверяем, что список файлов не пуст
+        if not downloaded_files:
+            logger.error(f"No MP3 files found in {TEMP_DIR} after download")
+            return jsonify({'error': 'Файл не был скачан'}), 500
+            
         latest_file = max(downloaded_files, key=os.path.getctime)
         
         # Переименовываем файл для кэширования
@@ -93,7 +101,6 @@ def get_audio(track_id):
     except Exception as e:
         logger.error(f"Error processing track ID {track_id}: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 if __name__ == '__main__':
     # Проверяем наличие spotdl
