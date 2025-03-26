@@ -63,15 +63,14 @@ def get_audio(track_id):
         # Формируем URL трека YouTube
         track_url = f"https://music.youtube.com/watch?v={track_id}"
         
-        # Используем yt-dlp напрямую вместо spotdl
-        output_template = os.path.join(TEMP_DIR, f"{track_id}.%(ext)s")
+        # Скачиваем трек через spotdl
         cmd = [
-            'yt-dlp',
-            '-x',  # извлечь аудио
-            '--audio-format', 'mp3',
-            '--audio-quality', '0',  # лучшее качество
-            '-o', output_template,
-            track_url
+            'spotdl',
+            track_url,
+            '--output', TEMP_DIR,
+            '--format', 'mp3',
+            '--bitrate', '320k',
+            '--threads', '1'
         ]
         
         logger.debug(f"Running command: {' '.join(cmd)}")
@@ -83,10 +82,18 @@ def get_audio(track_id):
         
         logger.debug(f"Download output: {result.stdout}")
 
-        # Проверяем, что файл существует
-        if not os.path.exists(audio_path):
-            logger.error(f"Expected file not found: {audio_path}")
+        # Ищем скачанный файл
+        downloaded_files = list(Path(TEMP_DIR).glob('*.mp3'))
+        
+        # Проверяем, что список файлов не пуст
+        if not downloaded_files:
+            logger.error(f"No MP3 files found in {TEMP_DIR} after download")
             return jsonify({'error': 'Файл не был скачан'}), 500
+            
+        latest_file = max(downloaded_files, key=os.path.getctime)
+        
+        # Переименовываем файл для кэширования
+        os.rename(latest_file, audio_path)
         
         return send_file(audio_path, mimetype='audio/mp3')
 
@@ -95,11 +102,20 @@ def get_audio(track_id):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Проверяем наличие yt-dlp
+    # Проверяем наличие spotdl
     try:
-        subprocess.run(['yt-dlp', '--version'], capture_output=True)
+        subprocess.run(['spotdl', '--version'], capture_output=True)
     except FileNotFoundError:
-        logger.error("yt-dlp не установлен. Установите его командой: pip install yt-dlp")
+        logger.error("spotdl не установлен. Установите его командой: pip install spotdl")
+        exit(1)
+    
+    # Проверяем и устанавливаем ffmpeg через spotdl
+    try:
+        logger.info("Проверка и установка ffmpeg через spotdl...")
+        subprocess.run(['spotdl', '--download-ffmpeg'], capture_output=True, check=True)
+        logger.info("ffmpeg успешно установлен")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Ошибка при установке ffmpeg: {e}")
         exit(1)
     
     # Проверяем наличие ffmpeg
