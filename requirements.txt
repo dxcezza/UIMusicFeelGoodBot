@@ -1,6 +1,6 @@
 Flask==3.0.2
 ytmusicapi==1.5.2
 ffmpeg-python==0.2.0
-spotdl==4.2.3
+spotdl==4.2.11
 pathlib==1.0.1
 ffmpeg==1.4
