@@ -93,9 +93,8 @@ def get_audio(track_id):
 
         # Проверяем, есть ли трек в базе данных
         track = db.query(Track).filter(Track.videoId == track_id).first()
-
         if track and track.is_downloaded and track.audioData:
-            # Если трек уже есть в базе, отправляем его
+            logger.debug("Audio data already exists in database")
             return send_file(
                 io.BytesIO(track.audioData),
                 mimetype='audio/mp3',
@@ -109,59 +108,59 @@ def get_audio(track_id):
             track_url = f"https://music.youtube.com/watch?v={track_id}"
             
             # Скачиваем трек через spotdl
-            cmd = [
-                'spotdl', track_url,
-                '--output', '-',  # Выводим данные в stdout
-                '--format', 'mp3',
-                '--bitrate', '128k'
-            ]
+            song = await Song.from_url(track_url)
+            if not song:
+                raise ValueError("Track not found on Spotify")
 
-            logger.debug(f"Running command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                raise ValueError(f"Failed to download track: {result.stderr}")
+            result = await Spotdl().download(song)
+            if not result:
+                raise ValueError("Failed to download track")
 
-            return result.stdout.encode()  # Преобразуем stdout в байты
+            # Читаем скачанный файл как байты
+            with open(result, 'rb') as audio_file:
+                audio_data = audio_file.read()
 
-        audio_data = asyncio.run(download_song())
+            # Получаем метаданные о треке
+            title = song.name or 'Unknown'
+            artist = song.artists[0] if song.artists else 'Unknown'
+            thumbnail = song.cover_url or "https://example.com/default_thumbnail.jpg"  # Стандартная обложка
 
-        # Получаем информацию о треке через ytmusicapi
-        track_info = ytmusic.get_song(track_id)
-        if not track_info:
-            return jsonify({'error': 'Трек не найден'}), 404
+            return {
+                'title': title,
+                'artist': artist,
+                'thumbnail': thumbnail,
+                'audio_data': audio_data
+            }
 
-        title = track_info.get('title', 'Unknown')
-        artist = track_info.get('artists', [{}])[0].get('name', 'Unknown')
-        thumbnail = track_info.get('thumbnails', [{}])[-1].get('url', None)
+        song_info = asyncio.run(download_song())
 
         # Если трек еще не существует в базе, создаем новую запись
         if not track:
             track = Track(
                 videoId=track_id,
-                title=title,
-                artist=artist,
-                thumbnail=thumbnail,
-                audioData=audio_data,
+                title=song_info['title'],
+                artist=song_info['artist'],
+                thumbnail=song_info['thumbnail'],  # Используем стандартную обложку, если она отсутствует
+                audioData=song_info['audio_data'],
                 is_downloaded=True
             )
             db.add(track)
         else:
             # Обновляем существующую запись
-            track.title = title
-            track.artist = artist
-            track.thumbnail = thumbnail
-            track.audioData = audio_data
+            track.title = song_info['title']
+            track.artist = song_info['artist']
+            track.thumbnail = song_info['thumbnail']  # Используем стандартную обложку, если она отсутствует
+            track.audioData = song_info['audio_data']
             track.is_downloaded = True
 
         db.commit()
 
         # Отправляем файл клиенту
         return send_file(
-            io.BytesIO(audio_data),
+            io.BytesIO(song_info['audio_data']),
             mimetype='audio/mp3',
             as_attachment=True,
-            download_name=f"{title}.mp3"
+            download_name=f"{song_info['title']}.mp3"
         )
 
     except ValueError as ve:
