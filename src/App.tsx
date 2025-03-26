@@ -53,7 +53,7 @@ function App() {
   const touchStartY = useRef<number | null>(null);
   const minSwipeDistance = 50; // минимальное расстояние для свайпа
 
-  const apiUrl = process.env.REACT_APP_API_URL; // Используем переменную окружения для базового URL API
+  const apiUrl = "https://music-library-production.up.railway.app/api"; // Используем переменную окружения для базового URL API
   
   // Prevent scroll when adjusting equalizer sliders
   useEffect(() => {
