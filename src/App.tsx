@@ -53,6 +53,11 @@ function App() {
   const touchStartY = useRef<number | null>(null);
   const minSwipeDistance = 50; // минимальное расстояние для свайпа
 
+  const apiUrl = process.env.REACT_APP_API_URL; // Используем переменную окружения для базового URL API
+  if (!apiUrl) {
+    throw new Error('REACT_APP_API_URL не установлена');
+  }
+  
   // Prevent scroll when adjusting equalizer sliders
   useEffect(() => {
     const preventScroll = (e: TouchEvent) => {
@@ -147,7 +152,7 @@ function App() {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/search?query=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(`${apiUrl}/search?query=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) throw new Error('Search failed');
       const data = await response.json();
       setTracks(data);
@@ -166,7 +171,7 @@ function App() {
 
   const playTrack = async (track: Track) => {
     setCurrentTrack(track);
-    const audioUrl = `/api/get_audio/${track.videoId}`;
+    const audioUrl = `${apiUrl}/get_audio/${track.videoId}`;
     setAudioUrl(audioUrl);
     setIsPlaying(true);
 
