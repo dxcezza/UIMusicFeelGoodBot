@@ -8,3 +8,4 @@ SQLAlchemy==2.0.39
 dotenv==0.9.9
 psycopg2==2.9.10
 asyncio==3.4.3
+flask-cors==5.0.1
