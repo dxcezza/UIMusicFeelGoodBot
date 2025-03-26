@@ -24,7 +24,6 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL не установлен в переменных окружения")
 
-ytmusic = YTMusic()
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
@@ -41,7 +40,7 @@ def get_db():
 
 @app.route("/")
 def index():
-    return send_from_directory(app.static_folder, 'index.html')
+    return send_file(os.path.join(app.static_folder, 'index.html'))
 
 @app.route('/api/search', methods=['GET'])
 def search_tracks():
@@ -53,18 +52,17 @@ def search_tracks():
         # Используем ytmusicapi для поиска
         ytmusic = YTMusic()
         search_results = ytmusic.search(query, filter='songs', limit=10)
-        
-        # Форматируем результаты
+
         tracks = [
             {
+                'videoId': track['videoId'],
                 'title': track['title'],
                 'artist': track['artists'][0]['name'] if track['artists'] else 'Unknown',
-                'videoId': track['videoId'],
-                'thumbnail': track['thumbnails'][-1]['url'] if track['thumbnails'] else None
+                'thumbnail': track['thumbnails'][-1]['url'] if track['thumbnails'] else "https://example.com/default_thumbnail.jpg"
             }
             for track in search_results
         ]
-        
+
         # Проверяем базу данных на наличие треков
         db = next(get_db())
         existing_tracks = db.query(Track).filter(Track.title.ilike(f"%{query}%")).all()
@@ -72,10 +70,10 @@ def search_tracks():
         if existing_tracks:
             tracks.extend([
                 {
+                    'videoId': track.videoId,
                     'title': track.title,
                     'artist': track.artist,
-                    'videoId': track.videoId,
-                    'thumbnail': track.thumbnail
+                    'thumbnail': track.thumbnail or "https://example.com/default_thumbnail.jpg"
                 }
                 for track in existing_tracks
             ])
@@ -105,7 +103,7 @@ def get_audio(track_id):
         # Если трека нет или он не скачан, скачиваем его через spotdl
         async def download_song():
             # Формируем URL трека Spotify
-            track_url = f"https://music.youtube.com/watch?v={track_id}"
+            track_url = f"https://open.spotify.com/track/{track_id}"
             
             # Скачиваем трек через spotdl
             song = await Song.from_url(track_url)
