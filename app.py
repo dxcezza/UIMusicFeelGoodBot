@@ -1,10 +1,16 @@
-from flask import Flask, request, jsonify, send_file, render_template, send_from_directory
+from flask import Flask, request, jsonify, send_file, send_from_directory
 import os
 import logging
-import subprocess
-from pathlib import Path
+import io
+import yt_dlp
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from model import Track, Base
+from dotenv import load_dotenv
 from ytmusicapi import YTMusic
-import ffmpeg
+
+# Загружаем переменные окружения
+load_dotenv()
 
 app = Flask(__name__, static_folder='dist', static_url_path='')
 
@@ -12,13 +18,23 @@ app = Flask(__name__, static_folder='dist', static_url_path='')
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Настройка временной директории
-TEMP_DIR = 'temp'
-if not os.path.exists(TEMP_DIR):
-    os.makedirs(TEMP_DIR)
+# Настройка базы данных
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL не установлен в переменных окружения")
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
 
 # Инициализация YTMusic
 ytmusic = YTMusic()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @app.route("/")
 def index():
@@ -47,82 +63,79 @@ def search_tracks():
         
         return jsonify(tracks)
     except Exception as e:
-        logger.error(f"Error searching tracks: {e}")
+        logger.error(f"Ошибка поиска треков: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/get_audio/<track_id>', methods=['GET'])
 def get_audio(track_id):
     try:
-        logger.debug(f"Processing track ID: {track_id}")
+        db = next(get_db())
+        
+        # Проверяем, есть ли трек в базе данных
+        track = db.query(Track).filter(Track.videoId == track_id).first()
+        
+        if track and track.is_downloaded and track.audioData:
+            # Если трек уже есть в базе, отправляем его
+            return send_file(
+                io.BytesIO(track.audioData),
+                mimetype='audio/mp3',
+                as_attachment=True,
+                download_name=f"{track.title}.mp3"
+            )
 
-        # Проверяем кэш
-        audio_path = os.path.join(TEMP_DIR, f"{track_id}.mp3")
-        if os.path.exists(audio_path):
-            logger.debug(f"Audio file already exists: {audio_path}")
-            return send_file(audio_path, mimetype='audio/mp3')
+        # Если трека нет или он не скачан, скачиваем его
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '128',
+            }],
+        }
 
-        # Формируем URL трека YouTube
-        track_url = f"https://music.youtube.com/watch?v={track_id}"
-        
-        # Получаем список файлов до скачивания
-        files_before = set(os.listdir(TEMP_DIR))
-        
-        # Скачиваем трек через spotdl
-        cmd = [
-            'spotdl',
-            track_url,
-            '--output', TEMP_DIR,
-            '--format', 'mp3',
-            '--bitrate', '128k',
-            '--threads', '1'
-        ]
-        
-        logger.debug(f"Running command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            logger.error(f"Download error: {result.stderr}")
-            return jsonify({'error': 'Ошибка скачивания'}), 500
-
-        # Получаем список файлов после скачивания
-        files_after = set(os.listdir(TEMP_DIR))
-        
-        # Находим новые файлы
-        new_files = files_after - files_before
-        logger.debug(f"New files: {new_files}")
-        
-        if not new_files:
-            logger.error("No new files found after download")
-            return jsonify({'error': 'Файл не был скачан'}), 500
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Получаем информацию о треке
+            info = ydl.extract_info(f"https://music.youtube.com/watch?v={track_id}", download=False)
             
-        # Ищем среди новых файлов MP3
-        mp3_files = [f for f in new_files if f.endswith('.mp3')]
-        
-        if not mp3_files:
-            logger.error("No MP3 files found among new files")
-            return jsonify({'error': 'MP3 файл не найден'}), 500
-            
-        # Берем первый найденный MP3 файл
-        downloaded_file = os.path.join(TEMP_DIR, mp3_files[0])
-        
-        # Переименовываем файл для кэширования
-        os.rename(downloaded_file, audio_path)
-        
-        return send_file(audio_path, mimetype='audio/mp3')
+            # Скачиваем аудио во временный файл
+            with ydl.download([f"https://music.youtube.com/watch?v={track_id}"]) as download_path:
+                # Читаем скачанный файл
+                with open(download_path, 'rb') as audio_file:
+                    audio_data = audio_file.read()
+
+                # Если трек еще не существует в базе, создаем новую запись
+                if not track:
+                    track = Track(
+                        videoId=track_id,
+                        title=info.get('title', 'Unknown'),
+                        artist=info.get('artist', 'Unknown'),
+                        thumbnail=info.get('thumbnail', ''),
+                        audioData=audio_data,
+                        is_downloaded=True
+                    )
+                    db.add(track)
+                else:
+                    # Обновляем существующую запись
+                    track.audioData = audio_data
+                    track.is_downloaded = True
+
+                db.commit()
+
+                # Отправляем файл клиенту
+                return send_file(
+                    io.BytesIO(audio_data),
+                    mimetype='audio/mp3',
+                    as_attachment=True,
+                    download_name=f"{track.title}.mp3"
+                )
 
     except Exception as e:
-        logger.error(f"Error processing track ID {track_id}: {e}")
+        logger.error(f"Ошибка обработки track ID {track_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
-
 if __name__ == '__main__':
-    # Проверяем наличие spotdl
-    try:
-        subprocess.run(['spotdl', '--version'], capture_output=True)
-    except FileNotFoundError:
-        logger.error("spotdl не установлен. Установите его командой: pip install spotdl")
-        exit(1)
-    
-        
     port = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=port)
+
+
+    
