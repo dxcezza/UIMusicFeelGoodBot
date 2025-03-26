@@ -104,7 +104,7 @@ def get_audio(track_id):
         # Если трека нет или он не скачан, скачиваем его через spotdl
         async def download_song():
             # Формируем URL трека Spotify
-            track_url = f"https://open.spotify.com/track/{track_id}"
+            track_url = f"https://music.youtube.com/watch?v={track_id}"
             
             # Скачиваем трек через spotdl
             song = await Song.from_url(track_url)
