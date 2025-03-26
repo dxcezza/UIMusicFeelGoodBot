@@ -2,12 +2,11 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 import os
 import logging
 import io
-import yt_dlp
+import subprocess
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from model import Track, Base
 from dotenv import load_dotenv
-from ytmusicapi import YTMusic
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -61,7 +60,23 @@ def search_tracks():
             for track in search_results
         ]
         
+        # Проверяем базу данных на наличие треков
+        db = next(get_db())
+        existing_tracks = db.query(Track).filter(Track.title.ilike(f"%{query}%")).all()
+
+        if existing_tracks:
+            tracks.extend([
+                {
+                    'title': track.title,
+                    'artist': track.artist,
+                    'videoId': track.videoId,
+                    'thumbnail': track.thumbnail
+                }
+                for track in existing_tracks
+            ])
+
         return jsonify(tracks)
+
     except Exception as e:
         logger.error(f"Ошибка поиска треков: {e}")
         return jsonify({'error': str(e)}), 500
@@ -70,10 +85,10 @@ def search_tracks():
 def get_audio(track_id):
     try:
         db = next(get_db())
-        
+
         # Проверяем, есть ли трек в базе данных
         track = db.query(Track).filter(Track.videoId == track_id).first()
-        
+
         if track and track.is_downloaded and track.audioData:
             # Если трек уже есть в базе, отправляем его
             return send_file(
@@ -83,59 +98,75 @@ def get_audio(track_id):
                 download_name=f"{track.title}.mp3"
             )
 
-        # Если трека нет или он не скачан, скачиваем его
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '128',
-            }],
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Получаем информацию о треке
-            info = ydl.extract_info(f"https://music.youtube.com/watch?v={track_id}", download=False)
+        # Если трека нет или он не скачан, скачиваем его через spotdl
+        async def download_song():
+            # Формируем URL трека Spotify
+            track_url = f"https://open.spotify.com/track/{track_id}"
             
-            # Скачиваем аудио во временный файл
-            with ydl.download([f"https://music.youtube.com/watch?v={track_id}"]) as download_path:
-                # Читаем скачанный файл
-                with open(download_path, 'rb') as audio_file:
-                    audio_data = audio_file.read()
+            # Скачиваем трек через spotdl
+            cmd = [
+                'spotdl',
+                '--song', track_url,
+                '--output', '-',  # Выводим данные в stdout
+                '--format', 'mp3',
+                '--bitrate', '128k'
+            ]
 
-                # Если трек еще не существует в базе, создаем новую запись
-                if not track:
-                    track = Track(
-                        videoId=track_id,
-                        title=info.get('title', 'Unknown'),
-                        artist=info.get('artist', 'Unknown'),
-                        thumbnail=info.get('thumbnail', ''),
-                        audioData=audio_data,
-                        is_downloaded=True
-                    )
-                    db.add(track)
-                else:
-                    # Обновляем существующую запись
-                    track.audioData = audio_data
-                    track.is_downloaded = True
+            logger.debug(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                raise ValueError(f"Failed to download track: {result.stderr}")
 
-                db.commit()
+            return result.stdout.encode()  # Преобразуем stdout в байты
 
-                # Отправляем файл клиенту
-                return send_file(
-                    io.BytesIO(audio_data),
-                    mimetype='audio/mp3',
-                    as_attachment=True,
-                    download_name=f"{track.title}.mp3"
-                )
+        audio_data = asyncio.run(download_song())
 
+        # Получаем информацию о треке через ytmusicapi (для метаданных)
+        track_info = ytmusic.get_song(track_id)
+        if not track_info:
+            return jsonify({'error': 'Трек не найден'}), 404
+
+        title = track_info.get('title', 'Unknown')
+        artist = track_info.get('artists', [{}])[0].get('name', 'Unknown')
+        thumbnail = track_info.get('thumbnails', [{}])[-1].get('url', None)
+
+        # Если трек еще не существует в базе, создаем новую запись
+        if not track:
+            track = Track(
+                videoId=track_id,
+                title=title,
+                artist=artist,
+                thumbnail=thumbnail,
+                audioData=audio_data,
+                is_downloaded=True
+            )
+            db.add(track)
+        else:
+            # Обновляем существующую запись
+            track.title = title
+            track.artist = artist
+            track.thumbnail = thumbnail
+            track.audioData = audio_data
+            track.is_downloaded = True
+
+        db.commit()
+
+        # Отправляем файл клиенту
+        return send_file(
+            io.BytesIO(audio_data),
+            mimetype='audio/mp3',
+            as_attachment=True,
+            download_name=f"{title}.mp3"
+        )
+
+    except ValueError as ve:
+        logger.error(f"ValueError processing track ID {track_id}: {ve}")
+        return jsonify({'error': str(ve)}), 404
     except Exception as e:
-        logger.error(f"Ошибка обработки track ID {track_id}: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error processing track ID {track_id}: {e}")
+        return jsonify({'error': 'Не удалось скачать аудио'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=port)
-
-
-    
