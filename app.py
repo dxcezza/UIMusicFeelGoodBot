@@ -67,7 +67,7 @@ def search_tracks():
     logger.info(f"Found {len(formatted_results)} tracks.")
     return jsonify(formatted_results)
 
-@app.route('/api/get_audio/<track_id>', methods=['GET'])
+@app.route('/api/get_audio/<track_id>', methods=['POST'])
 def download_track(track_id):
     try:
         logger.info(f"Processing request to download track with ID: {track_id}")
@@ -87,11 +87,11 @@ def download_track(track_id):
         
         # Формируем команду для spotdl
         output_path_template = os.path.join(DOWNLOAD_FOLDER, f"%(title)s.%(ext)s")
-        command = [
-            "spotdl", "download", youtube_url,
-            "--output", output_path_template,
-            "--ffmpeg", "ffmpeg"  # Убедитесь, что ffmpeg установлен
-        ]
+        command = subprocess.run(
+            ['spotdl', 'download', youtube_url, '--output', output_path_template],
+            capture_output=True,
+            text=True
+        )
         
         logger.info(f"Executing command: {' '.join(command)}")
         
